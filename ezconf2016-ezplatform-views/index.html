@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Extending and Customizing the eZ Platform User Interface &ndash; eZ Conference Workshop 2016</title>
+
+    <meta name="description" content="Extending and Customizing the eZ Platform User Interface">
+    <meta name="author" content="Damien Pobel">
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+
+    <link href='https://fonts.googleapis.com/css?family=Maven+Pro:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/ez-2016.css" id="theme">
+
+    <!-- Code syntax highlighting -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+
+    <!--[if lt IE 9]>
+    <script src="lib/js/html5shiv.js"></script>
+    <![endif]-->
+</head>
+
+<body class="ez">
+
+<div class="reveal">
+
+    <!-- Any section element inside of this container is displayed as a slide -->
+    <div class="slides">
+        <section class="ez-title-slide" data-background="assets/ibex.svg">
+            <div class="ez-overlay-box">
+                <h1 class="ez-slide-title">The eZ&nbsp;Platform<br />View Layer</h1>
+            </div>
+
+            <ul class="ez-slide-meta">
+                <li>Bertrand Dunogier</li>
+                <li>Platform Lead</li>
+                <li><a href="mailto:bd@ez.no">bd@ez.no</a></li>
+                <li><a href="https://twitter.com/bdunogier">@bdunogier</a></li>
+            </ul>
+            <ul class="ez-slide-meta">
+                <li>
+                    This presentation is online:
+                    <a href="http://j.mp/extending-platformui-2016" style="white-space:nowrap">http://j.mp/extending-platformui-2016</a>
+                </li>
+                <li>
+                    <a href="https://github.com/dpobel/PlatformUIExtensionSkeletonBundle">PlatformUIExtensionSkeletonBundle</a> is available on Github</a>
+                </li>
+            </ul>
+        </section>
+
+        <section data-markdown>
+            <script type="text/template">
+                # About me
+
+                - 11th year at eZ, 13th year around it
+                - Platform backend lead engineer
+                - Focused on REST & Symfony layers
+            </script>
+        </section>
+
+
+        <section data-markdown>
+            <script type="text/template">
+                # Plan
+
+                1. The View Layer
+                1. Changes in Platform 1.x
+                1. Query types
+                1. The Query Controller
+                1. Using the View layer in your projects
+            </script>
+        </section>
+
+        <section>
+
+            <section data-markdown>
+                <script type="text/template">
+                    # The View Layer
+
+                    A layer that wraps around Symfony's MVC. For a given route, it loads a Value and renders it.
+                    It is mainly used to render content using UrlAliases and `ez_content:viewAction`.
+
+                    The template and controller can be customized using view configuration:
+
+                    ```yaml
+                    ezpublish:
+                      system:
+                        site:
+                          content_view:
+                            full:
+                              article:
+                                template: 'content/view/full/article.html.twig'
+                                controller: 'app.article_controller:viewArticleAction'
+                                match:
+                                  Identifier\ContentType: 'article'
+                    ```
+                </script>
+            </section>
+
+            <section data-markdown data-separator-notes="^Note:">
+                <script type="text/template">
+                    # How it worked in eZ Publish 5.x
+
+                    Configuration had two keys: `location_view` and `content_view`. The first one was used to customize
+                    rendering of Locations and Url Aliases.
+
+                    Custom controllers actions were required to build the response using the `ViewManager`:
+
+                    ```php
+                    public function showArticleAction( $locationId, $viewType, $layout = false, array $params = array() )
+                    {
+                        return $this->get( 'ez_content' )->viewLocation(
+                            $locationId,
+                            $viewType,
+                            $layout,
+                            array(
+                                'showSummary' => $this->container->getParameter( 'ezdemo.article.full_view.show_summary' ),
+                                'showImage' => $this->container->getParameter( 'ezdemo.article.full_view.show_image' )
+                            ) + $params
+                        );
+                    }
+                    ```
+
+                    An alternative is to extend the kernel's view controller, and call methods such as `renderLocation`.
+
+                </script>
+            </section>
+
+            <section data-markdown data-separator-notes="^Note:">
+                <script type="text/template">
+                    # Drawbacks
+
+                    - Requires complex calls
+                    - Error prone
+                    - Tight coupling with the native view controller
+                </script>
+            </section>
+
+            <section data-background="assets/view_request_architecture.svg">
+            </section>
+
+            <section data-markdown data-separator-notes="^Note:">
+                <script type="text/template">
+                    # What has changed in Platform 1.x
+
+                    **Location view is deprecated**, and only **Content view** should be used. This allows a working preview
+                    of any version, including the first one.
+
+                    Custom controllers do not need to inherit from a built-in one anymore.
+
+                    A view controller action should by default return the `$view` parameter it gets as an argument:
+
+                    ```
+                    namespace AppBundle\Controller;
+
+                    class ArticleController
+                    {
+                        public function viewArticleAction(ContentView $view)
+                        {
+                            $view->addParameters(['some_value' => 'whatever']);
+
+                            return $view;
+                        }
+                    }
+                    ```
+
+                    View parameters will be available in the view template.
+                </script>
+            </section>
+        </section>
+
+
+        <section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Query types
+
+                    Added in eZ Platform 1.x.
+
+                    They are named Query factories that support parameters, and can be registered either by naming
+                    convention, or using a service tag.
+
+                    ```php
+                    $query = $queryType->getQuery(['paramName' => $paramValue]);
+                    $searchService->findLocations($query);
+                    ```
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Use-case: `LocationChildren` query type
+
+                    A QueryType that builds a LocationQuery searching for children of a given location id.
+
+                    In addition to the `parentLocationId` parameter, it optionally accepts `limit` and `offset`:
+
+                    ```
+                    $query = $queryType->getQuery(['parentLocationId' => 2, 'limit' => 5]);
+                    $searchService->findLocations($query);
+                    ```
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # LocationChildren QueryType structure
+
+                    All QueryTypes must implement the `\eZ\Publish\Core\QueryType\QueryType` interface, that has three
+                    methods:
+
+                    ```php
+                    namespace AppBundle\QueryType;
+
+                    class LocationChildrenQueryType implements QueryType
+                    {
+                        public function getQuery(array $parameters = []): Query
+
+                        public function getSupportedParameters(): array
+
+                        public static function getName(): string
+                    }
+                    ```
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # The `getSupportedParameters()` method
+
+                    Returns the supported parameters names.
+
+                    ```php
+                    public function getSupportedParameters()
+                    {
+                        return ['parentLocationId', 'offset', 'limit'];
+                    }
+                    ```
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # The `getName` **static** method
+
+                    Returns the name of the `QueryType`.
+
+                    ```php
+                    public function getName()
+                    {
+                        return 'app.location_children';
+                    }
+                    ```
+
+                    _(Thank you Mr. Obvious)_
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # The `getQuery()` method
+
+                    - Called to build the Query
+                    - Receives the build parameters
+                    - Returns the Query object
+
+                    ```php
+                    public function getQuery(array $parameters = [])
+                    {
+                        return new LocationQuery([
+                            'filter' => new Criterion\ParentLocationId($parameters['parentLocationId']),
+                            'offset' => $parameters['offset'] ?: 0,
+                            'limit' => $parameters['limit'] ?: 10,
+                        ]);
+                    }
+                    ```
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Using QueryTypes from PHP
+
+                    - inject a QueryType using its service
+                    - use the `ezpublish.query_type.registry` service
+                </script>
+            </section>
+
+        </section>
+
+        <section>
+            <section data-markdown>
+                <script type="text/template">
+                    # The Query controller
+
+                    A built-in view controller that runs a Query from a QueryType, and assigns the results
+                    to the view.
+
+                    It supports mapping of viewed content/location properties to QueryType parameters.
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Usage example
+
+                    ```yaml
+ezpublish:
+    system:
+        site:
+            content_view:
+                full:
+                    gallery:
+                        template: 'content/view/full/gallery.html.twig'
+                        controller: 'ez_query:locationQueryAction'
+                        params:
+                            query:
+                                query_type: app.location_children
+                                parameters:
+                                    parentLocationId: @=location.id
+                                assign_results_to: images
+                    ```
+
+                    The SearchResult object is assigned to the 'children' twig variable:
+
+                    ```jinja
+                    {% for searchResult in images.searchHits %}
+                        {{ render( controller(
+                            'ez_content:viewAction',
+                            {'content': searchResult.valueObject, 'viewType': 'embed'}
+                        ) }}
+                    {% endfor %}
+                    ```
+                </script>
+            </section>
+        </section>
+
+        <section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Custom Views
+
+                    The View layer can be re-used in order to provide customizable features.
+
+                    1. A value object to view (ex: `Content`)
+                    1. A View object (ex: `ContentView`)
+                    1. A very short controller (ex: `ContentViewController`)
+                    1. A ViewBuilder (ex: `ContentViewBuilder`)
+                </script>
+            </section>
+
+            <section data-markdown>
+                <script type="text/template">
+                    # The Value
+
+                    - Can be any value object
+                    - Will be made available in the view templates
+                    - Loaded from the ViewBuilder, using route parameters
+                </script>
+            </section>
+
+            <section data-markdown>
+                <script type="text/template">
+                    # The View object
+
+                    - Must implement the `View` interface
+                    - May implement the `BaseView` class
+                    - Instantiated by the ViewBuilder
+                    - May implement other View interfaces to add Matchers support
+                </script>
+            </section>
+
+            <section data-markdown>
+                <script type="text/template">
+                    # The ViewBuilder
+
+                    - Must implement the `ViewBuilder` interface
+                    - Must be registered with the `ezpublish.view_builder.registry`
+                      Manual registration for now, using a compiler pass / DIC extension
+                    - Uses the matched controller's name to filter requests
+                    - Must call a ViewConfigurator to apply templates & controller configuration
+                </script>
+            </section>
+
+            <section data-markdown>
+                <script type="text/template">
+                    # Custom matchers
+
+                    Allows custom business rules for view matching.
+
+                    @todo do me
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Optional: Custom matchers
+
+                    @todo do me
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Optional: View configuration
+
+                    @todo do me
+                </script>
+            </section>
+            <section data-markdown>
+                <script type="text/template" data-separator-notes="^Notes:">
+                    # Improvements possibilities
+
+                    - DX:
+                      - matchers
+                      - view providers
+                      - view configuration
+                </script>
+            </section>
+        </section>
+
+        <section data-markdown>
+            <script type="text/template" data-separator-notes="^Notes:">
+                # Conclusion & Questions
+            </script>
+        </section>
+    </div>
+</div>
+
+<script src="lib/js/head.min.js"></script>
+<script src="js/reveal.js"></script>
+
+<script>
+
+    // Full list of configuration options available at:
+    // https://github.com/hakimel/reveal.js#configuration
+    Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: false,
+        slideNumber: true,
+
+        transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+        width: '100%',
+        height: '100%',
+        margin: 0,
+
+        // Optional reveal.js plugins
+        dependencies: [
+            { src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+            { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+            { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+            { src: 'plugin/highlight/highlight.js', async: true, condition: function() { return true; }, callback: function() { hljs.initHighlightingOnLoad(); } },
+            { src: 'plugin/zoom-js/zoom.js', async: true },
+            { src: 'plugin/notes/notes.js', async: true }
+        ]
+    });
+
+</script>
+
+</body>
+</html>
