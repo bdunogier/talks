@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
 
-    <title>Extending and Customizing the eZ Platform User Interface &ndash; eZ Conference Workshop 2016</title>
+    <title>The eZ Platform View layer &ndash; eZ Conference 2016</title>
 
     <meta name="description" content="Extending and Customizing the eZ Platform User Interface">
     <meta name="author" content="Damien Pobel">
@@ -115,10 +115,7 @@
                 <script type="text/template">
                     # How it worked in eZ Publish 5.x
 
-                    Configuration had two keys: `location_view` and `content_view`. The first one was used to customize
-                    rendering of Locations and Url Aliases.
-
-                    Custom controllers actions were required to build the response using the `ViewManager`:
+                    Two types of views: `location_view` and `content_view`.
 
                     ```php
                     public function showArticleAction( $locationId, $viewType, $layout = false, array $params = array() )
@@ -127,15 +124,10 @@
                             $locationId,
                             $viewType,
                             $layout,
-                            array(
-                                'showSummary' => $this->container->getParameter( 'ezdemo.article.full_view.show_summary' ),
-                                'showImage' => $this->container->getParameter( 'ezdemo.article.full_view.show_image' )
-                            ) + $params
+                            ['some_variable' => 'some_value'] + $params
                         );
                     }
                     ```
-
-                    An alternative is to extend the kernel's view controller, and call methods such as `renderLocation`.
 
                 </script>
             </section>
@@ -146,7 +138,7 @@
 
                     - Requires complex calls
                     - Error prone
-                    - Tight coupling with the native view controller
+                    - Tight coupling with the extended view controller, complex BC
                 </script>
             </section>
 
@@ -157,14 +149,10 @@
                 <script type="text/template">
                     # What has changed in Platform 1.x
 
-                    **Location view is deprecated**, and only **Content view** should be used. This allows a working preview
-                    of any version, including the first one.
+                    - **`location_view` is deprecated**, and only `content_view` should be used**.
+                    - Custom controllers do not need to inherit from a built-in one anymore.
 
-                    Custom controllers do not need to inherit from a built-in one anymore.
-
-                    A view controller action should by default return the `$view` parameter it gets as an argument:
-
-                    ```
+                    ```php
                     namespace AppBundle\Controller;
 
                     class ArticleController
@@ -178,7 +166,7 @@
                     }
                     ```
 
-                    View parameters will be available in the view template.
+                    Parameters will be made available in the view template.
                 </script>
             </section>
         </section>
@@ -208,7 +196,7 @@
 
                     In addition to the `parentLocationId` parameter, it optionally accepts `limit` and `offset`:
 
-                    ```
+                    ```php
                     $query = $queryType->getQuery(['parentLocationId' => 2, 'limit' => 5]);
                     $searchService->findLocations($query);
                     ```
@@ -328,7 +316,7 @@ ezpublish:
                                 assign_results_to: images
                     ```
 
-                    The SearchResult object is assigned to the 'children' twig variable:
+                    The SearchResult object is assigned to the 'images' twig variable:
 
                     ```jinja
                     {% for searchResult in images.searchHits %}
@@ -340,6 +328,13 @@ ezpublish:
                     ```
                 </script>
             </section>
+            <section data-markdown>
+                <script type="text/template">
+                    # Conclusion
+
+                    And questions maybe ?
+                </script>
+            </section>
         </section>
 
         <section>
@@ -347,12 +342,12 @@ ezpublish:
                 <script type="text/template">
                     # Custom Views
 
-                    The View layer can be re-used in order to provide customizable features.
+                    The View layer can be re-used in order to allow customization of reusable components.
 
-                    1. A value object to view (ex: `Content`)
-                    1. A View object (ex: `ContentView`)
-                    1. A very short controller (ex: `ContentViewController`)
-                    1. A ViewBuilder (ex: `ContentViewBuilder`)
+                    1. A value object to view (ex: `SystemInfo`)
+                    1. A View object (ex: `SystemInfoView`)
+                    1. A very short controller (ex: `SystemInfoController`)
+                    1. A ViewBuilder (ex: `SystemInfoViewBuilder`)
                 </script>
             </section>
 
@@ -372,8 +367,9 @@ ezpublish:
 
                     - Must implement the `View` interface
                     - May implement the `BaseView` class
-                    - Instantiated by the ViewBuilder
+                    - Instantiated by the `ViewBuilder`
                     - May implement other View interfaces to add Matchers support
+                      Examples: `ContentValueView`, `LocationValueView`
                 </script>
             </section>
 
@@ -395,21 +391,24 @@ ezpublish:
 
                     Allows custom business rules for view matching.
 
-                    @todo do me
-                </script>
-            </section>
-            <section data-markdown>
-                <script type="text/template">
-                    # Optional: Custom matchers
+                    Example: `View\Matcher\SystemInfo\Identifier`.
 
-                    @todo do me
+                    Requires a custom `ViewProvider` and `ViewMatcherFactory`.
+
+                    Examples: `support_tools.view.system_info.provider` and `support_tools.view.matcher_factory`
+                    in `view.yml`.
                 </script>
             </section>
             <section data-markdown>
                 <script type="text/template">
                     # Optional: View configuration
 
-                    @todo do me
+                    Siteaccess aware, semantic view configuration.
+
+                    Requirements:
+                    - a `ConfigParser`. Example: `SystemInfoViewParser`
+                    - injection into the `ezpublish` extension, if you want it below
+
                 </script>
             </section>
             <section data-markdown>
